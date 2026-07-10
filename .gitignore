@@ -1,5 +1,6 @@
-# Claude Code local settings / memory
+# Claude Code local settings / memory / project context
 .claude/
+CLAUDE.md
 
 # OS cruft
 .DS_Store
