@@ -29,6 +29,19 @@ N_TOP_ORD  = 30           # distinct colors for the most common orders; rest -> 
 SEED       = 42
 N_JOBS     = int(os.environ.get("SLURM_CPUS_PER_TASK", "16"))
 
+# MG08 confidence colorscale. Monotonically increasing luminance so that on the
+# black canvas low-confidence points stay dim and recede into the background
+# haze, while high-confidence points glow warm/bright and pop out. Reads as
+# "hotter = more confident" — the black-background-correct form of the intuitive
+# "deeper color = more confident". Distinct from the reference categorical hues.
+CONF_SCALE = [
+    [0.00, "#3a3a4d"],   # low confidence  -> dim slate, recedes on black
+    [0.30, "#5b4b8a"],   #                 -> violet
+    [0.55, "#9b3f9b"],   #                 -> magenta
+    [0.75, "#e0563f"],   #                 -> orange-red
+    [1.00, "#ffe14d"],   # high confidence -> bright warm yellow, pops
+]
+
 rng = np.random.default_rng(SEED)
 _t0 = time.time()
 def log(msg):
@@ -110,13 +123,27 @@ log(f"{len(top_orders)} distinct orders colored; {len(counts)} orders total")
 log("Building figure")
 fig = go.Figure()
 
-# MG08 grey underlay (drawn first so reference sits on top)
+# MG08 underlay (drawn first so reference sits on top), colored by prediction
+# confidence: dim = uncertain "dark matter" haze, bright = confident calls.
 mg_cd = np.array(list(zip(mg_sample_ids.tolist(), mg_family.tolist(), mg_conf.tolist())),
                  dtype=object)
 fig.add_trace(go.Scattergl(
     x=mg_2d[:, 0], y=mg_2d[:, 1], mode="markers",
     name=f"MG08 unknown ({len(mg_2d):,})",
-    marker=dict(size=2, color="rgba(160,160,160,0.30)"),
+    marker=dict(
+        size=2.5, opacity=0.60,
+        color=mg_conf, colorscale=CONF_SCALE, cmin=0.0, cmax=1.0,
+        colorbar=dict(
+            title=dict(text="MG08 prediction confidence", side="top",
+                       font=dict(color="#cccccc", size=11)),
+            orientation="h", thickness=12, len=0.26,
+            x=0.01, xanchor="left", y=0.02, yanchor="bottom",
+            tickvals=[0.0, 0.25, 0.5, 0.75, 1.0],
+            tickfont=dict(color="#cccccc", size=9),
+            outlinecolor="#333333", outlinewidth=1,
+            bgcolor="rgba(20,20,20,0.45)",
+        ),
+    ),
     customdata=mg_cd,
     hovertemplate=("<b>MG08 contig</b><br>%{customdata[0]}"
                    "<br>pred family: %{customdata[1]}"

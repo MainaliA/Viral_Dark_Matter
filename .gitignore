@@ -17,3 +17,6 @@ umap_atlas_*.log
 
 # Local scratch
 _smoke*.html
+
+# Rendered atlas — large generated artifact; regenerate via umap_atlas.py (SEED=42)
+MG08_umap_atlas.html
