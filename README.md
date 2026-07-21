@@ -32,9 +32,13 @@ co-embed in RAM. Instead:
 4. Merge reference taxonomy and MG08 predictions, export one Plotly HTML.
 
 **Visualization.** Plotly `Scattergl` (WebGL) for smooth pan/zoom at scale.
-Reference points are colored by taxonomic order (top ~30 orders colored, rarer
-orders grouped as `other`); MG08 points are grey with predicted family +
-confidence on hover. Black background, equal aspect ratio.
+Reference points are colored by taxonomic order (top ~30 orders colored, the
+rest grouped as `other`); MG08 points are colored by prediction confidence
+(three toggleable tiers). Black background, equal aspect ratio.
+
+Note: the grey `other` reference bucket is ~52% of the reference — mostly
+VirusHostDB genomes with **no ICTV order assigned** (≈50% of the DB), not a long
+tail of rare orders. Single-click it in the legend to hide it.
 
 Default render: **150K reference + 150K MG08 = 300K points**.
 
@@ -46,8 +50,14 @@ Default render: **150K reference + 150K MG08 = 300K points**.
 |-----|---------|---------|
 | `N_REF` | `150000` | reference points to fit UMAP on |
 | `N_MG08` | `150000` | MG08 points to transform + overlay |
+| `CONF_T_LO` | `0.33` | low\|medium MG08 confidence-tier boundary |
+| `CONF_T_HI` | `0.66` | medium\|high MG08 confidence-tier boundary |
 | `OUT_HTML` | `.../MG08_umap_atlas.html` | output path |
 | `SLURM_CPUS_PER_TASK` | `16` | UMAP `n_jobs` |
+
+The MG08 overlay is split into three independent confidence-tier legend entries
+(MG08 low / medium / high conf); **double-click a tier to isolate it** — e.g. to
+view only the high-confidence calls. `CONF_T_LO` / `CONF_T_HI` set the cutoffs.
 
 ## Running on Laguna (USC CARC)
 

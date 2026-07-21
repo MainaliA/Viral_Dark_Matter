@@ -293,10 +293,19 @@ global); `min_dist` controls how tightly points pack. Tuning these (e.g.
 - **Reference viruses** are colored by taxonomic **order** (the top 30 of ~72
   orders get distinct colors; the rest collapse to grey `"other"`). Hover shows
   the family. These colored clouds are the "known-world" map.
+  - **The big grey `"other"` mass is ~52% of the reference**, and it is *not* a
+    long tail of rare orders: **50.6% of VirusHostDB has no ICTV *order* assigned
+    at all** (the `order` field is blank — order is a high rank that viral
+    taxonomy often leaves empty), and only ~0.9% is genuinely rare named orders.
+    So "other" really means "reference viruses ICTV hasn't placed into an order."
+    It's toggleable (single-click it in the legend to hide it); planned work is to
+    relabel/dim it or color the reference by *family* (better coverage) instead.
 - **MG08 unknown contigs** are the overlay. **Each MG08 point is now colored by
   its prediction confidence** via a sequential colorscale: **dim = uncertain,
-  bright/warm = confident** (see §6). Hover shows the contig ID, predicted
-  family, and confidence.
+  bright/warm = confident** (see §6). The overlay is further split into three
+  independent, toggleable confidence tiers (MG08 low / medium / high conf) so you
+  can isolate just the confident calls — double-click the *high* tier. Hover shows
+  the contig ID, predicted family, and confidence.
 - Reading it: MG08 points that fall **inside** a colored reference cluster *and*
   glow bright are the model's confident, plausible calls. The vast dim haze
   sitting in the gaps between known families is the dark matter.
@@ -331,8 +340,22 @@ Consequences, all intentional:
   `cmin=0, cmax=1` keeps the scale anchored to the true probability range so the
   color is honest, not stretched.
 
-Because MG08 is a single Plotly trace, you can click it in the legend to
-toggle it, or hide reference orders, to study one layer at a time.
+**The MG08 layer is split into three confidence tiers in the legend** — *MG08
+low conf* (`<0.33`), *MG08 medium conf* (`0.33–0.66`), and *MG08 high conf*
+(`≥0.66`). Each is its **own standalone legend entry**, exactly like the
+reference-order entries (they are deliberately *not* bundled into one Plotly
+legend group — a group looks like a drop-down but makes Plotly toggle/isolate all
+three at once, which defeats the purpose). So each tier behaves independently:
+single-click a tier to toggle it, or **double-click one to isolate it** (hide
+everything else). This is how you view **only the high-confidence calls on their
+own** — double-click *MG08 high conf* and the dark-matter haze drops away, leaving
+just the confident predictions to study against the reference clusters. The tiers
+still use the same continuous colorscale (anchored `cmin=0, cmax=1`, so a given
+confidence is the same color in any tier — a point does not change color when
+isolated), and the shared colorbar rides on the high tier so it stays visible when
+you isolate it. Each tier also has its own hover label (`MG08 contig (high conf)`
+etc.). Thresholds are configurable via the `CONF_T_LO` / `CONF_T_HI` environment
+variables.
 
 ---
 

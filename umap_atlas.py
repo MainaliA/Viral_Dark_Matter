@@ -42,6 +42,14 @@ CONF_SCALE = [
     [1.00, "#ffe14d"],   # high confidence -> bright warm yellow, pops
 ]
 
+# MG08 confidence tiers. The single MG08 layer is split into these bins, each
+# emitted as its own trace under a shared legend group, so it toggles like any
+# reference-order entry: double-click a tier to isolate it (e.g. view ONLY the
+# high-confidence calls). Thresholds are [lo, hi) on confidence; defaults sit at
+# the observed median (0.33) and a selective high cut (0.66), env-overridable.
+CONF_T_LO = float(os.environ.get("CONF_T_LO", "0.33"))  # low | medium boundary
+CONF_T_HI = float(os.environ.get("CONF_T_HI", "0.66"))  # medium | high boundary
+
 rng = np.random.default_rng(SEED)
 _t0 = time.time()
 def log(msg):
@@ -109,14 +117,20 @@ mg_family = pred["predicted_family"].reindex(mg_sample_ids).fillna("NA").to_nump
 mg_conf   = pred["confidence"].reindex(mg_sample_ids).fillna(0.0).to_numpy()
 
 # --------------------------- coloring -----------------------------
+# Catch-all bucket: mostly VirusHostDB genomes with NO ICTV `order` assigned at
+# all (~50% of the reference — order is a high rank ICTV often leaves blank), plus
+# a small tail of genuinely rare orders (rank 31+). It is NOT a taxonomic group,
+# so it is labeled honestly and dimmed to near-background so it recedes into the
+# black haze instead of dominating the atlas as a bright grey mass.
+OTHER_LABEL = "no ICTV order"
 counts = Counter(o for o in ref_order if o != "unclassified")
 top_orders = [o for o, _ in counts.most_common(N_TOP_ORD)]
 top_set = set(top_orders)
-ref_order_plot = np.array([o if o in top_set else "other" for o in ref_order])
+ref_order_plot = np.array([o if o in top_set else OTHER_LABEL for o in ref_order])
 
 palette = px.colors.qualitative.Dark24 + px.colors.qualitative.Light24
 color_map = {o: palette[i % len(palette)] for i, o in enumerate(top_orders)}
-color_map["other"] = "#555555"
+color_map[OTHER_LABEL] = "#1c1c1c"   # very dim near-black grey -> faint haze on black bg
 log(f"{len(top_orders)} distinct orders colored; {len(counts)} orders total")
 
 # ----------------------------- plot -------------------------------
@@ -125,15 +139,39 @@ fig = go.Figure()
 
 # MG08 underlay (drawn first so reference sits on top), colored by prediction
 # confidence: dim = uncertain "dark matter" haze, bright = confident calls.
+# Split into confidence tiers, each its OWN standalone legend entry (like the
+# reference-order entries) — NOT a shared legendgroup. A shared group looks like
+# a drop-down but makes Plotly toggle/isolate the whole group at once; standalone
+# entries let you double-click a single tier to view only those points (e.g. the
+# high-confidence calls on their own). Names are prefixed "MG08" and legendrank'd
+# so the three sit together at the top of the legend, reading most-confident
+# first. Points keep the continuous CONF_SCALE coloring with fixed cmin/cmax=0..1,
+# so a given confidence maps to the same color in every tier (gradient preserved).
 mg_cd = np.array(list(zip(mg_sample_ids.tolist(), mg_family.tolist(), mg_conf.tolist())),
                  dtype=object)
-fig.add_trace(go.Scattergl(
-    x=mg_2d[:, 0], y=mg_2d[:, 1], mode="markers",
-    name=f"MG08 unknown ({len(mg_2d):,})",
-    marker=dict(
-        size=2.5, opacity=0.60,
-        color=mg_conf, colorscale=CONF_SCALE, cmin=0.0, cmax=1.0,
-        colorbar=dict(
+
+# draw order low -> high so confident points sit on top of the haze; legendrank
+# reorders the legend to read most-confident first.
+mg_tiers = [
+    dict(key="low",    lo=0.0,       hi=CONF_T_LO, rank=3,
+         label="low conf (<%.2f)" % CONF_T_LO),
+    dict(key="medium", lo=CONF_T_LO, hi=CONF_T_HI, rank=2,
+         label="medium conf (%.2f-%.2f)" % (CONF_T_LO, CONF_T_HI)),
+    dict(key="high",   lo=CONF_T_HI, hi=1.01,      rank=1,
+         label="high conf (>=%.2f)" % CONF_T_HI),
+]
+for t in mg_tiers:
+    t["mask"] = (mg_conf >= t["lo"]) & (mg_conf < t["hi"])
+
+for t in mg_tiers:
+    m = t["mask"]
+    if not m.any():
+        continue
+    marker = dict(size=2.5, opacity=0.60,
+                  color=mg_conf[m], colorscale=CONF_SCALE, cmin=0.0, cmax=1.0)
+    if t["key"] == "high":
+        # one shared colorbar, on the high tier so it survives isolating it
+        marker["colorbar"] = dict(
             title=dict(text="MG08 prediction confidence", side="top",
                        font=dict(color="#cccccc", size=11)),
             orientation="h", thickness=12, len=0.26,
@@ -142,16 +180,23 @@ fig.add_trace(go.Scattergl(
             tickfont=dict(color="#cccccc", size=9),
             outlinecolor="#333333", outlinewidth=1,
             bgcolor="rgba(20,20,20,0.45)",
-        ),
-    ),
-    customdata=mg_cd,
-    hovertemplate=("<b>MG08 contig</b><br>%{customdata[0]}"
-                   "<br>pred family: %{customdata[1]}"
-                   "<br>confidence: %{customdata[2]:.2f}<extra></extra>"),
-))
+        )
+    else:
+        marker["showscale"] = False
+    fig.add_trace(go.Scattergl(
+        x=mg_2d[m, 0], y=mg_2d[m, 1], mode="markers",
+        name=f"MG08 {t['label']} ({int(m.sum()):,})",
+        legendrank=t["rank"],
+        marker=marker,
+        customdata=mg_cd[m],
+        hovertemplate=(f"<b>MG08 contig ({t['key']} conf)</b>"
+                       "<br>%{customdata[0]}"
+                       "<br>pred family: %{customdata[1]}"
+                       "<br>confidence: %{customdata[2]:.2f}<extra></extra>"),
+    ))
 
 # reference, one trace per order for a toggleable legend
-for o in top_orders + ["other"]:
+for o in top_orders + [OTHER_LABEL]:
     mask = ref_order_plot == o
     if not mask.any():
         continue
@@ -159,6 +204,9 @@ for o in top_orders + ["other"]:
     fig.add_trace(go.Scattergl(
         x=ref_2d[mask, 0], y=ref_2d[mask, 1], mode="markers",
         name=f"{o} ({int(mask.sum()):,})",
+        # the "no ICTV order" catch-all is hidden by default (one legend tap to show)
+        # so the atlas opens on the classified signal only; still one tap from full view.
+        visible=("legendonly" if o == OTHER_LABEL else True),
         marker=dict(size=2.5, color=color_map[o]),
         customdata=cd,
         hovertemplate=("<b>%{customdata[2]}</b><br>%{customdata[0]}"
@@ -173,11 +221,20 @@ fig.update_layout(
     legend=dict(font=dict(size=9), itemsizing="constant", bgcolor="rgba(0,0,0,0)",
                 bordercolor="#333333", borderwidth=1),
     xaxis=dict(visible=False), yaxis=dict(visible=False),
-    width=1500, height=950,
+    autosize=True,                                   # fill the browser tab, resize with the window
     margin=dict(l=0, r=230, t=40, b=0),
 )
 fig.update_yaxes(scaleanchor="x", scaleratio=1)  # equal aspect -> circular cloud
 
 log(f"Writing {OUT_HTML}")
-fig.write_html(OUT_HTML, include_plotlyjs=True, full_html=True)  # embedded -> works offline
+# default_*="100vw/100vh" + responsive -> the plot fills a generic Chrome tab (no zoom, no white edges)
+fig.write_html(OUT_HTML, include_plotlyjs=True, full_html=True,
+               default_width="100vw", default_height="100vh",
+               config={"responsive": True})
+# strip the default 8px <body> margin (would show as a white border on the black atlas)
+with open(OUT_HTML, "r") as fh:
+    _html = fh.read()
+_html = _html.replace("<body>", '<body style="margin:0;background:#000;overflow:hidden">', 1)
+with open(OUT_HTML, "w") as fh:
+    fh.write(_html)
 log("Done")
