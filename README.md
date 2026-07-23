@@ -3,9 +3,15 @@
 Interactive UMAP visualization of viral metagenomic sequences in ESM-2 protein
 language model embedding space, in the style of Meta's ESM Metagenomic Atlas.
 
+### ▶ [View the live interactive atlas](https://mainalia.github.io/Viral_Dark_Matter/MG08_umap_atlas.html)
+
+Opens right in your browser — pan, zoom, toggle layers, hover for per-point
+detail. No install, no download, no account required.
+
 Reference viruses (VirusHostDB) are colored by taxonomic **order**; unknown
-environmental contigs from sample **MG08** are overlaid as grey points, each
-carrying its classifier-predicted family and confidence on hover.
+environmental contigs from sample **MG08** are overlaid and colored by
+classifier **prediction confidence** (three toggleable tiers), each carrying its
+predicted family and confidence on hover.
 
 ## What this repo contains
 
