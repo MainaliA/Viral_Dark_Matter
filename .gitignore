@@ -1,7 +1,8 @@
 # Claude Code local settings / memory / project context
 .claude/
 CLAUDE.md
-
+Explanation.md
+Q&A.md
 # OS cruft
 .DS_Store
 
@@ -18,5 +19,8 @@ umap_atlas_*.log
 # Local scratch
 _smoke*.html
 
-# Rendered atlas — large generated artifact; regenerate via umap_atlas.py (SEED=42)
-MG08_umap_atlas.html
+# Local backups (e.g. MG08_umap_atlas.html.bak) — keep out of the repo
+*.bak
+
+# NOTE: MG08_umap_atlas.html is now PUBLISHED via GitHub Pages (final artifact),
+# so it is intentionally tracked. Regenerate via umap_atlas.py (SEED=42).
